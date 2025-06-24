@@ -1,2 +1,5 @@
 pandas
 openpyxl
+matplotlib
+openai
+python-dotenv
