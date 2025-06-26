@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import pandas as pd
 import plotly.express as px
 
@@ -98,7 +98,7 @@ def plotar_grafico_sellout(df_sellout, ano=None):
     )
 
     return fig
-=======
+
 import pandas as pd
 import plotly.express as px
 
@@ -198,4 +198,4 @@ def plotar_grafico_sellout(df_sellout, ano=None):
     )
 
     return fig
->>>>>>> ac43d95327d7b538c41408063131c50a1c5b6699
+
