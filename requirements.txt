@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 streamlit>=1.25.0,<2.0.0
 pandas>=2.0.0
 plotly>=5.15.0
@@ -10,12 +9,9 @@ python-dotenv>=1.0.0
 watchdog>=3.0.0
 bcrypt>=4.0.1
 PyYAML>=6.0.1
-
-
 # Recomendado (mas opcional):
 bcrypt>=4.0.1        # Usado internamente pelo streamlit-authenticator
 PyYAML>=6.0.1        # Usado pelo streamlit-authenticator
-=======
 streamlit>=1.25.0,<2.0.0
 pandas>=2.0.0
 plotly>=5.15.0
@@ -27,9 +23,7 @@ python-dotenv>=1.0.0
 watchdog>=3.0.0
 bcrypt>=4.0.1
 PyYAML>=6.0.1
-
-
 # Recomendado (mas opcional):
 bcrypt>=4.0.1        # Usado internamente pelo streamlit-authenticator
 PyYAML>=6.0.1        # Usado pelo streamlit-authenticator
->>>>>>> ac43d95327d7b538c41408063131c50a1c5b6699
+
