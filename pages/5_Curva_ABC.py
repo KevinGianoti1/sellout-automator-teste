@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import streamlit as st
 
 # 🛠️ Configuração da página
@@ -83,7 +83,7 @@ st.markdown("---")
 st.subheader("📋 Classificação ABC dos Produtos Vendidos")
 colunas_exibicao = [col for col in ["Código", "Descrição", "Curva ABC"] if col in produtos_com_curva.columns]
 st.dataframe(produtos_com_curva[colunas_exibicao].drop_duplicates(), use_container_width=True)
-=======
+
 import streamlit as st
 
 # 🛠️ Configuração da página
@@ -168,4 +168,4 @@ st.markdown("---")
 st.subheader("📋 Classificação ABC dos Produtos Vendidos")
 colunas_exibicao = [col for col in ["Código", "Descrição", "Curva ABC"] if col in produtos_com_curva.columns]
 st.dataframe(produtos_com_curva[colunas_exibicao].drop_duplicates(), use_container_width=True)
->>>>>>> ac43d95327d7b538c41408063131c50a1c5b6699
+
