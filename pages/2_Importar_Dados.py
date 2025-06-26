@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import streamlit as st
 st.set_page_config(page_title="📥 Importar Dados", page_icon="📤", layout="wide")
 
@@ -56,7 +56,7 @@ if arquivo:
         st.error(f"❌ Erro ao processar os dados: {e}")
 else:
     st.warning("Envie um arquivo Excel para simular a importação de dados.")
-=======
+
 import streamlit as st
 st.set_page_config(page_title="📥 Importar Dados", page_icon="📤", layout="wide")
 
@@ -114,4 +114,4 @@ if arquivo:
         st.error(f"❌ Erro ao processar os dados: {e}")
 else:
     st.warning("Envie um arquivo Excel para simular a importação de dados.")
->>>>>>> ac43d95327d7b538c41408063131c50a1c5b6699
+
