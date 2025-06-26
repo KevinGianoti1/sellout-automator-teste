@@ -1,5 +1,16 @@
-__pycache__/
-*.pyc
-data/*.db
+# Evitar chaves expostas
 .streamlit/secrets.toml
 chave.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Ambientes virtuais
+.venv/
+env/
+venv/
+
+# Arquivos temporários
+*.log
+*.DS_Store
