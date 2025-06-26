@@ -4,7 +4,7 @@ import streamlit as st
 st.set_page_config(page_title="🔐 Login", layout="wide")
 
 # ✅ Agora pode importar estilos e outros
-from style_config import
+from style_config import *
 
 st.markdown("# 🔐 Login")
 
