@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import streamlit as st
 
 # 🔧 Configuração da página
@@ -101,7 +101,7 @@ with st.expander("⬇️ Exportar Relatórios"):
         st.download_button("📁 Baixar Sell Out", data=sellout_df.to_csv(index=False).encode("utf-8"), file_name="sellout.csv", mime="text/csv")
     with col2:
         st.download_button("📁 Baixar Resumo de Itens", data=resumo_df.to_csv(index=False).encode("utf-8"), file_name="resumo.csv", mime="text/csv")
-=======
+
 import streamlit as st
 
 # 🔧 Configuração da página
@@ -204,4 +204,4 @@ with st.expander("⬇️ Exportar Relatórios"):
         st.download_button("📁 Baixar Sell Out", data=sellout_df.to_csv(index=False).encode("utf-8"), file_name="sellout.csv", mime="text/csv")
     with col2:
         st.download_button("📁 Baixar Resumo de Itens", data=resumo_df.to_csv(index=False).encode("utf-8"), file_name="resumo.csv", mime="text/csv")
->>>>>>> ac43d95327d7b538c41408063131c50a1c5b6699
+
