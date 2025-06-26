@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import streamlit as st
 
 # ⛔️ Nada pode vir antes deste comando
@@ -22,7 +21,7 @@ with st.form("login_form"):
             st.session_state["usuario"] = email
         else:
             st.error("Preencha todos os campos para entrar.")
-=======
+
 import streamlit as st
 
 # ⛔️ Nada pode vir antes deste comando
@@ -46,4 +45,4 @@ with st.form("login_form"):
             st.session_state["usuario"] = email
         else:
             st.error("Preencha todos os campos para entrar.")
->>>>>>> ac43d95327d7b538c41408063131c50a1c5b6699
+
