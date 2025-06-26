@@ -1,4 +1,4 @@
-
+<<<<<<< HEAD
 import streamlit as st
 
 # Aplicação de tema e estilo visual global
@@ -61,7 +61,7 @@ st.markdown("""
 # Cabeçalho visível no topo do app
 st.markdown('<div class="fixed-header">📊 SellOut Automator v2</div>', unsafe_allow_html=True)
 st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
-
+=======
 import streamlit as st
 
 # Aplicação de tema e estilo visual global
@@ -124,4 +124,4 @@ st.markdown("""
 # Cabeçalho visível no topo do app
 st.markdown('<div class="fixed-header">📊 SellOut Automator v2</div>', unsafe_allow_html=True)
 st.markdown('<div class="spacer"></div>', unsafe_allow_html=True)
-
+>>>>>>> ac43d95327d7b538c41408063131c50a1c5b6699
