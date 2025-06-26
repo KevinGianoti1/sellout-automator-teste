@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -67,7 +67,7 @@ if df is not None and "Ano" in df.columns:
         st.dataframe(df_total, use_container_width=True)
 else:
     st.warning("Nenhum dado de venda encontrado.")
-=======
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -136,4 +136,4 @@ if df is not None and "Ano" in df.columns:
         st.dataframe(df_total, use_container_width=True)
 else:
     st.warning("Nenhum dado de venda encontrado.")
->>>>>>> ac43d95327d7b538c41408063131c50a1c5b6699
+
