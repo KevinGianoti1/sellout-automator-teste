@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import streamlit as st
 
 # 🔧 Configuração da página
@@ -94,7 +94,7 @@ st.plotly_chart(fig, use_container_width=True)
 st.markdown("---")
 st.subheader("📋 Tabela SellOut")
 st.dataframe(sellout_df, use_container_width=True)
-=======
+
 import streamlit as st
 
 # 🔧 Configuração da página
@@ -190,4 +190,4 @@ st.plotly_chart(fig, use_container_width=True)
 st.markdown("---")
 st.subheader("📋 Tabela SellOut")
 st.dataframe(sellout_df, use_container_width=True)
->>>>>>> ac43d95327d7b538c41408063131c50a1c5b6699
+
