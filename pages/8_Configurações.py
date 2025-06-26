@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # pages/8⚙️_Configurações.py
 import streamlit as st
 
@@ -105,7 +105,7 @@ st.markdown("""
         </ul>
     </div>
 """, unsafe_allow_html=True)
-=======
+
 # pages/8⚙️_Configurações.py
 import streamlit as st
 
@@ -212,4 +212,4 @@ st.markdown("""
         </ul>
     </div>
 """, unsafe_allow_html=True)
->>>>>>> ac43d95327d7b538c41408063131c50a1c5b6699
+
