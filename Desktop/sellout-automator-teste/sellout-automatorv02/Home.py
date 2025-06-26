@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import streamlit as st
 from datetime import datetime
 
@@ -92,4 +91,4 @@ with col2:
 st.markdown("---")
 
 st.info("Use o menu lateral para navegar entre as páginas.")
->>>>>>> ac43d95327d7b538c41408063131c50a1c5b6699
+
