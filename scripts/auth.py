@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import streamlit_authenticator as stauth
 
 # Lista de nomes, usernames, perfis, empresas e apelidos
@@ -42,7 +42,7 @@ credentials = {
         for (username, name, _, perfil, empresa, apelido), hashed in zip(user_data, hashed_passwords)
     }
 }
-=======
+
 import streamlit_authenticator as stauth
 
 # Lista de nomes, usernames, perfis, empresas e apelidos
@@ -86,4 +86,4 @@ credentials = {
         for (username, name, _, perfil, empresa, apelido), hashed in zip(user_data, hashed_passwords)
     }
 }
->>>>>>> ac43d95327d7b538c41408063131c50a1c5b6699
+
