@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import streamlit as st
 
 # 💧 Configuração
@@ -86,7 +86,7 @@ st.plotly_chart(fig, use_container_width=True)
 # 🔢 Tabela Detalhada
 with st.expander("🔎 Ver Tabela Detalhada"):
     st.dataframe(df_filtrado, use_container_width=True)
-=======
+
 import streamlit as st
 
 # 💧 Configuração
@@ -174,4 +174,4 @@ st.plotly_chart(fig, use_container_width=True)
 # 🔢 Tabela Detalhada
 with st.expander("🔎 Ver Tabela Detalhada"):
     st.dataframe(df_filtrado, use_container_width=True)
->>>>>>> ac43d95327d7b538c41408063131c50a1c5b6699
+
