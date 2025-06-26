@@ -57,7 +57,7 @@ with col2:
 st.markdown("---")
 
 st.info("👈 Use o menu lateral para navegar entre as páginas do seu dashboard.")
-=======
+
 import streamlit as st
 from datetime import datetime
 
