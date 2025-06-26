@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # 📈 SellOut Automator v2
 
 SaaS corporativo para análise de vendas B2B. Desenvolvido para representantes comerciais que precisam entender o comportamento de compra dos seus clientes de forma rápida, responsiva e visualmente intuitiva.
@@ -120,4 +120,3 @@ A autenticação ainda é visual (mock). Não é uma implementação de seguran�
 
 Desenvolvido em parceria com [@analista.vendas](mailto:analista.vendas@mfferramentas.com.br)
 
->>>>>>> ac43d95327d7b538c41408063131c50a1c5b6699
