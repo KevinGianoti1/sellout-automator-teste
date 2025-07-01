@@ -29,21 +29,47 @@ resumo_df = st.session_state["resumo_df"]
 # 🔍 Gera categorias via IA a partir das descrições (top 1000)
 st.subheader("🧐 Geração de Categorias por IA")
 amostra = resumo_df[["Descrição"]].drop_duplicates().head(1000)
-descricoes = "\n".join([f"{i+1}. {desc}" for i, desc in enumerate(amostra["Descrição"].tolist())])
+import textwrap
 
-prompt = f"""
-Você é um classificador de produtos B2B. Com base nas descrições numeradas abaixo, atribua uma categoria resumida para cada item.
+descricao_list = amostra["Descrição"].astype(str).tolist()
+lotes = [descricao_list[i:i + 50] for i in range(0, len(descricao_list), 50)]
+categorias_final = []
 
-Retorne exatamente em JSON com a estrutura:
-[
-  {{"Descrição": "Texto da descrição", "Categoria": "Nome da categoria"}},
-  ...
-]
+with st.spinner("Gerando categorias via IA..."):
+    try:
+        for idx, lote in enumerate(lotes):
+            descricoes = "; ".join(lote)
+            prompt = f"""
+            Você é um classificador de produtos B2B. Com base nas descrições abaixo, atribua uma **única categoria comercial** para cada descrição.
 
-Descrições:
-{descricoes}
+            Descrições:
+            {descricoes}
+
+            Retorne no seguinte formato JSON:
+            [
+              {{"Descrição": "...", "Categoria": "..."}},
+              ...
+            ]
+            """
+
+            resposta = openai.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": textwrap.dedent(prompt)}],
+                temperature=0.2,
+            )
+
+            content = resposta.choices[0].message.content.strip()
+            categorias_parciais = json.loads(content)
+            categorias_final.extend(categorias_parciais)
+
+        cat_df = pd.DataFrame(categorias_final)
+        resumo_df = resumo_df.merge(cat_df, on="Descrição", how="left")
+        st.success("✅ Categorias geradas com sucesso!")
+    except Exception as e:
+        st.error(f"❌ Erro ao processar categorias: {e}")
+        st.stop()
+
 """
-
 with st.spinner("Gerando categorias via IA..."):
     try:
         resposta = openai.chat.completions.create(
