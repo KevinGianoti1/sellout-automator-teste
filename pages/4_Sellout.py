@@ -95,9 +95,17 @@ st.subheader("📦 Resumo de SKUs Vendidos")
 st.dataframe(resumo_df, use_container_width=True)
 
 # 📁 Botões de Download
+from io import BytesIO
+from sellout_generator import salvar_relatorio_completo
+
+buffer = BytesIO()
+salvar_relatorio_completo(sellout_df, resumo_df, buffer)
+buffer.seek(0)
+
 with st.expander("⬇️ Exportar Relatórios"):
-    col1, col2 = st.columns(2)
-    with col1:
-        st.download_button("📁 Baixar Sell Out", data=sellout_df.to_csv(index=False).encode("utf-8"), file_name="sellout.csv", mime="text/csv")
-    with col2:
-        st.download_button("📁 Baixar Resumo de Itens", data=resumo_df.to_csv(index=False).encode("utf-8"), file_name="resumo.csv", mime="text/csv")
+    st.download_button(
+        label="📁 Baixar Relatório Excel (Completo)",
+        data=buffer,
+        file_name="relatorio_sellout.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
