@@ -1,14 +1,14 @@
-
 import streamlit as st
 
 # 💧 Configuração
-st.set_page_config(page_title="📊 Comparativo por Categoria", page_icon="🛆", layout="wide")
+st.set_page_config(page_title="📊 Comparativo por Categoria", page_icon="🗆", layout="wide")
 st.markdown("# 🍿️ Comparativo de Categorias com IA")
 
 import pandas as pd
 import plotly.express as px
 import openai
 import json
+import textwrap
 from db import buscar_resumo
 from style_config import *
 
@@ -19,7 +19,7 @@ except Exception:
     st.error("❌ Chave da OpenAI ausente ou mal configurada.")
     st.stop()
 
-# 📅 Usuário atual e dados
+# 🗕️ Usuário atual e dados
 if "resumo_df" not in st.session_state:
     st.warning("Nenhum dado encontrado. Importe os dados primeiro na página 'Importar Dados'.")
     st.stop()
@@ -29,8 +29,6 @@ resumo_df = st.session_state["resumo_df"]
 # 🔍 Gera categorias via IA a partir das descrições (top 1000)
 st.subheader("🧐 Geração de Categorias por IA")
 amostra = resumo_df[["Descrição"]].drop_duplicates().head(1000)
-import textwrap
-
 descricao_list = amostra["Descrição"].astype(str).tolist()
 lotes = [descricao_list[i:i + 50] for i in range(0, len(descricao_list), 50)]
 categorias_final = []
@@ -39,22 +37,22 @@ with st.spinner("Gerando categorias via IA..."):
     try:
         for idx, lote in enumerate(lotes):
             descricoes = "; ".join(lote)
-            prompt = f"""
-            Você é um classificador de produtos B2B. Com base nas descrições abaixo, atribua uma **única categoria comercial** para cada descrição.
+            prompt = textwrap.dedent(f"""
+                Você é um classificador de produtos B2B. Com base nas descrições abaixo, atribua uma única categoria comercial para cada descrição.
 
-            Descrições:
-            {descricoes}
+                Descrições:
+                {descricoes}
 
-            Retorne no seguinte formato JSON:
-            [
-              {{"Descrição": "...", "Categoria": "..."}},
-              ...
-            ]
-            """
+                Retorne no seguinte formato JSON:
+                [
+                  {{"Descrição": "...", "Categoria": "..."}},
+                  ...
+                ]
+            """)
 
             resposta = openai.chat.completions.create(
                 model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": textwrap.dedent(prompt)}],
+                messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
             )
 
@@ -63,23 +61,6 @@ with st.spinner("Gerando categorias via IA..."):
             categorias_final.extend(categorias_parciais)
 
         cat_df = pd.DataFrame(categorias_final)
-        resumo_df = resumo_df.merge(cat_df, on="Descrição", how="left")
-        st.success("✅ Categorias geradas com sucesso!")
-    except Exception as e:
-        st.error(f"❌ Erro ao processar categorias: {e}")
-        st.stop()
-
-"""
-with st.spinner("Gerando categorias via IA..."):
-    try:
-        resposta = openai.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-        )
-        content = resposta.choices[0].message.content.strip()
-        categorias = json.loads(content)
-        cat_df = pd.DataFrame(categorias)
         resumo_df = resumo_df.merge(cat_df, on="Descrição", how="left")
         st.success("✅ Categorias geradas com sucesso!")
     except Exception as e:
