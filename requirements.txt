@@ -11,7 +11,7 @@ watchdog>=3.0.0
 bcrypt>=4.0.1
 PyYAML>=6.0.1
 openai
-
+xlsxwriter
 
 # Recomendado (mas opcional):
 bcrypt>=4.0.1        # Usado internamente pelo streamlit-authenticator
