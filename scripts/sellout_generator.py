@@ -18,7 +18,7 @@ def gerar_sellout(df):
         columns="Mês Nome",
         values="Total",
         aggfunc="sum",
-        fill_value=0
+        observed=False
     ).reset_index()
 
     for mes in meses_ordem:
