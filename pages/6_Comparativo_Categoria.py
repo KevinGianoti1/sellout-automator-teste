@@ -29,18 +29,19 @@ resumo_df = st.session_state["resumo_df"]
 # 🔍 Gera categorias via IA a partir das descrições (top 1000)
 st.subheader("🧐 Geração de Categorias por IA")
 amostra = resumo_df[["Descrição"]].drop_duplicates().head(1000)
-descricoes = "; ".join(amostra["Descrição"].astype(str).tolist())
+descricoes = "\n".join([f"{i+1}. {desc}" for i, desc in enumerate(amostra["Descrição"].tolist())])
 
 prompt = f"""
-Você é um classificador de produtos B2B. Com base nas descrições abaixo, crie uma categoria resumida para cada uma:
+Você é um classificador de produtos B2B. Com base nas descrições numeradas abaixo, atribua uma categoria resumida para cada item.
 
-{descricoes}
-
-Retorne em formato JSON no estilo:
+Retorne exatamente em JSON com a estrutura:
 [
-  {{"Descrição": "...", "Categoria": "..."}},
+  {{"Descrição": "Texto da descrição", "Categoria": "Nome da categoria"}},
   ...
 ]
+
+Descrições:
+{descricoes}
 """
 
 with st.spinner("Gerando categorias via IA..."):
