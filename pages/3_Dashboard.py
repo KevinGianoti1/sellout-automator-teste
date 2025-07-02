@@ -114,4 +114,39 @@ st.plotly_chart(fig, use_container_width=True)
 # 📋 Tabela
 st.markdown("---")
 st.subheader("📋 Tabela SellOut")
-st.dataframe(sellout_df, use_container_width=True)
+
+# Filtros
+col1, col2 = st.columns(2)
+anos = sorted(sellout_df["Ano"].unique(), reverse=True)
+clientes = sorted(sellout_df["Cliente"].unique())
+
+with col1:
+    ano_filtro = st.selectbox("Filtrar por Ano", options=["Todos"] + anos)
+with col2:
+    cliente_filtro = st.selectbox("Filtrar por Cliente", options=["Todos"] + clientes)
+
+filtro = sellout_df.copy()
+if ano_filtro != "Todos":
+    filtro = filtro[filtro["Ano"] == ano_filtro]
+if cliente_filtro != "Todos":
+    filtro = filtro[filtro["Cliente"] == cliente_filtro]
+
+# Formatação R$ e Totais
+colunas_valores = filtro.select_dtypes(include=["float", "int"]).columns
+filtro_formatado = filtro.copy()
+filtro_formatado[colunas_valores] = filtro_formatado[colunas_valores].applymap(lambda x: f"R$ {x:,.2f}".replace(",", "v").replace(".", ",").replace("v", "."))
+
+total_row = filtro[colunas_valores].sum().to_frame().T
+total_row.insert(0, filtro.columns[0], "TOTAL GERAL")
+for col in filtro.columns[1:]:
+    if col not in total_row.columns:
+        total_row[col] = ""
+
+total_formatado = total_row.copy()
+total_formatado[colunas_valores] = total_formatado[colunas_valores].applymap(lambda x: f"R$ {x:,.2f}".replace(",", "v").replace(".", ",").replace("v", "."))
+
+# Junta dados + total
+df_exibicao = pd.concat([filtro_formatado, total_formatado], ignore_index=True)
+
+st.dataframe(df_exibicao, use_container_width=True)
+
