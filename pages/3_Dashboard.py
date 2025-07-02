@@ -111,11 +111,11 @@ else:
 
 st.plotly_chart(fig, use_container_width=True)
 
-# 📋 Tabela
+# 📋 Tabela SellOut com Filtros, R$ e Total por Linha
 st.markdown("---")
 st.subheader("📋 Tabela SellOut")
 
-# Filtros
+# Filtros interativos
 col1, col2 = st.columns(2)
 anos = sorted(sellout_df["Ano"].unique(), reverse=True)
 clientes = sorted(sellout_df["Cliente"].unique())
@@ -131,22 +131,26 @@ if ano_filtro != "Todos":
 if cliente_filtro != "Todos":
     filtro = filtro[filtro["Cliente"] == cliente_filtro]
 
-# Formatação R$ e Totais
-colunas_valores = filtro.select_dtypes(include=["float", "int"]).columns
+# Detecta colunas monetárias (exceto "Ano")
+colunas_valores = filtro.select_dtypes(include=["float", "int"]).columns.tolist()
+colunas_valores = [col for col in colunas_valores if col != "Ano"]
+
+# Tabela formatada
 filtro_formatado = filtro.copy()
-filtro_formatado[colunas_valores] = filtro_formatado[colunas_valores].applymap(lambda x: f"R$ {x:,.2f}".replace(",", "v").replace(".", ",").replace("v", "."))
+filtro_formatado[colunas_valores] = filtro_formatado[colunas_valores].applymap(
+    lambda x: f"R$ {x:,.2f}".replace(",", "v").replace(".", ",").replace("v", ".")
+)
 
-total_row = filtro[colunas_valores].sum().to_frame().T
-total_row.insert(0, filtro.columns[0], "TOTAL GERAL")
-for col in filtro.columns[1:]:
-    if col not in total_row.columns:
-        total_row[col] = ""
+# Calcula totais (linha inferior)
+soma_totais = filtro[colunas_valores].sum().to_dict()
+linha_total = {col: "" for col in filtro.columns}
+linha_total["Cliente"] = "TOTAL GERAL"
+for col, valor in soma_totais.items():
+    linha_total[col] = f"R$ {valor:,.2f}".replace(",", "v").replace(".", ",").replace("v", ".")
 
-total_formatado = total_row.copy()
-total_formatado[colunas_valores] = total_formatado[colunas_valores].applymap(lambda x: f"R$ {x:,.2f}".replace(",", "v").replace(".", ",").replace("v", "."))
-
-# Junta dados + total
-df_exibicao = pd.concat([filtro_formatado, total_formatado], ignore_index=True)
+df_exibicao = pd.concat(
+    [filtro_formatado, pd.DataFrame([linha_total])],
+    ignore_index=True
+)
 
 st.dataframe(df_exibicao, use_container_width=True)
-
