@@ -98,7 +98,17 @@ with col3:
 # 📈 Gráfico
 st.markdown("---")
 st.subheader("📈 Evolução de Vendas")
-fig = plotar_grafico_sellout(sellout_df)
+
+# Filtro de Ano
+anos_disponiveis = sorted(sellout_df["Ano"].unique(), reverse=True)
+ano_selecionado = st.selectbox("Selecione o Ano", options=["Todos"] + anos_disponiveis)
+
+# Aplica filtro no gráfico
+if ano_selecionado == "Todos":
+    fig = plotar_grafico_sellout(sellout_df)
+else:
+    fig = plotar_grafico_sellout(sellout_df, ano=int(ano_selecionado))
+
 st.plotly_chart(fig, use_container_width=True)
 
 # 📋 Tabela
