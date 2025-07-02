@@ -110,6 +110,7 @@ total_mensal["Mês"] = pd.Categorical(total_mensal["Mês"], categories=ordem_mes
 
 # Agrupa e ordena corretamente
 total_mensal = total_mensal.groupby(["Ano", "Mês"]).agg({"Total": "sum"}).reset_index()
+total_mensal["Total"] = total_mensal["Total"].apply(lambda x: f"R$ {x:,.2f}".replace(",", "v").replace(".", ",").replace("v", "."))
 total_mensal = total_mensal.sort_values(["Ano", "Mês"])
 
 # Exibe a tabela
