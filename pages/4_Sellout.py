@@ -45,15 +45,27 @@ for i, s in enumerate(sugestoes):
 pergunta = st.text_input("Pergunta sobre os dados de Sell Out:", value=st.session_state.get("pergunta_sellout", ""))
 
 if pergunta:
-    with st.spinner("Consultando GPT-4o..."):
+    with st.spinner("Consultando GPT-3.5..."):
         contexto = resumo_df.head(1000).to_string(index=False)
         prompt = f"""
-        Você é um vendedor sênior em vendas B2B. Com base no seguinte resumo de dados (SKU, descrição, quantidade, valor, preço):
+        Você é um especialista em vendas B2B com foco em análise de sell-out e inteligência comercial.
 
+        Com base no resumo de dados abaixo — contendo colunas como SKU, Descrição, Qtde_Total, Valor_Total, Preço_Mínimo, Preço_Máximo — analise de forma objetiva, prática e orientada à ação comercial.
+
+        ### Dados:
         {contexto}
 
-        Responda a pergunta a seguir de forma prática e voltada à tomada de decisão em vendas:
+        ### Pergunta:
         {pergunta}
+
+        ### Instruções para sua resposta:
+        - Seja direto e use linguagem de negócios.
+        - Use listas, bullet points ou tabelas quando possível.
+        - Traga insights úteis para tomada de decisão.
+        - Evite repetir a pergunta ou dar rodeios.
+        - Caso os dados sejam insuficientes para uma resposta confiável, diga isso explicitamente.
+
+        Responda com foco em ajudar um vendedor a entender o que fazer a seguir.
         """
 
         resposta = openai.chat.completions.create(
