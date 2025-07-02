@@ -48,14 +48,25 @@ if pergunta:
     with st.spinner("Consultando GPT-4o..."):
         contexto = sellout_df.head(1000).to_string(index=False)
         prompt = f"""
-        Você é um vendedor sênior B2B. Com base na amostra de dados a seguir, forneça insights que possam ajudar um time de vendas a agir estrategicamente:
+        Você é um analista comercial experiente em vendas B2B, com foco em geração de insights estratégicos.
 
+        Abaixo está uma amostra dos dados de Sell Out (vendas por cliente, ano, mês e valores totais). Com base nesses dados, responda à pergunta com uma análise clara, prática e orientada à tomada de decisão.
+
+        ### Dados de vendas:
         {contexto}
 
-        Pergunta:
+        ### Pergunta:
         {pergunta}
 
-        Seja claro, direto e use uma linguagem prática para vendedores. Forneça sugestões ou observações aplicáveis quando possível.
+        ### Instruções para a resposta:
+        - Use linguagem comercial acessível a times de vendas.
+        - Se possível, traga porcentagens, comparações e padrões de comportamento.
+        - Aponte tendências de crescimento, sazonalidade ou concentração de vendas.
+        - Utilize listas ou estruturações visuais para facilitar leitura.
+        - Dê sugestões de ação (ex: “focar campanhas no mês X”, “negociar com cliente Y”, etc).
+        - Evite rodeios e contextualizações desnecessárias.
+
+        Se os dados forem insuficientes, diga isso com transparência.
         """
 
         resposta = openai.chat.completions.create(
