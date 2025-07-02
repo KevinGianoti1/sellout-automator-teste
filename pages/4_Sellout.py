@@ -94,11 +94,25 @@ if ano_sel != "Todos":
 if cliente_sel != "Todos":
     filtro_df = filtro_df[filtro_df["Cliente"] == cliente_sel]
 
-# 📊 Tabela - Totais por Ano e Mês
+# 📅 Totais Mensais por Ano - ordenando meses corretamente
 st.markdown("---")
 st.subheader("📅 Totais Mensais por Ano")
+
+# Derrete os dados
 total_mensal = filtro_df.melt(id_vars=["Cliente", "Ano"], var_name="Mês", value_name="Total")
+
+# Define a ordem correta dos meses
+ordem_meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+               'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+# Converte a coluna 'Mês' para categórica com ordem correta
+total_mensal["Mês"] = pd.Categorical(total_mensal["Mês"], categories=ordem_meses, ordered=True)
+
+# Agrupa e ordena corretamente
 total_mensal = total_mensal.groupby(["Ano", "Mês"]).agg({"Total": "sum"}).reset_index()
+total_mensal = total_mensal.sort_values(["Ano", "Mês"])
+
+# Exibe a tabela
 st.dataframe(total_mensal, use_container_width=True)
 
 # 📦 Tabela - Resumo de Itens
