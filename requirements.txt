@@ -1,3 +1,7 @@
+# relatorio_diario.py
+requests>=2.31.0
+
+# (já existente no projeto)
 streamlit>=1.25.0,<2.0.0
 pandas>=2.0.0
 plotly>=5.15.0

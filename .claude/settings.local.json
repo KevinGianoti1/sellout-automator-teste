@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -f \"mkdir app\")",
+      "Bash(rm -rf __pycache__)",
+      "Bash(mkdir -p output)",
+      "Bash(mv -f relatorio_diario.html output/)",
+      "Bash(mv -f relatorio_teste.html output/)",
+      "Bash(ls -lh *.py *.bat *.md .env*)",
+      "Bash(ls -ld output/ logs/)",
+      "Read(//c/tmp/**)",
+      "Bash(bash \"C:\\\\Users\\\\Maxiforce 01\\\\AppData\\\\Roaming\\\\Claude\\\\local-agent-mode-sessions\\\\skills-plugin\\\\8717bd00-59d3-4b7d-8ce4-c6719cf28996\\\\4a0ef2be-2253-470f-a7cb-bdb86551c46c\\\\skills\\\\web-artifacts-builder\\\\scripts\\\\init-artifact.sh\" relatorio-premium)",
+      "Bash(git add *)"
+    ]
+  }
+}
