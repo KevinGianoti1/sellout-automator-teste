@@ -1,0 +1,1025 @@
+{
+  "name": "MARCIA 4.3 - PYRAMID DIAMANTADOS | ROSANA → N8N → RD STATION",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "leads",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "7df9ae8c-a1ad-4db6-a57c-c2b7f1601c9b",
+      "name": "WEBHOOK ROSANA",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -3040,
+        592
+      ],
+      "webhookId": "b01e4bb9-400b-4be4-a8ec-a21034cb05cf"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst body = $input.first().json.body ?? $input.first().json;\n\nconst nome        = String(body.name        ?? '').trim();\nconst tel         = String(body.phone       ?? '').trim();\nconst cnpj        = String(body.cnpj        ?? '').replace(/\\D/g, '');\nconst origem      = String(body.origin      ?? '').trim();\n\n// Primeira mensagem do cliente (vem com texto do anúncio ex: \"vim do utm_campaign\")\nconst origemAnuncio = String(body.first_message ?? body.utm_campaign ?? body.ad_name ?? '').trim();\n\nif (!nome || !tel || cnpj.length !== 14 || !origem) {\n  throw new Error(`Campos obrigatórios faltando | nome:${nome} | tel:${tel} | cnpj:${cnpj} | origem:${origem}`);\n}\n\nreturn [{json: {\n  name:           nome,\n  phone:          tel,\n  cnpj:           cnpj,\n  origin:         origem,\n  origem_anuncio: origemAnuncio || origem,\n  email:          String(body.email   ?? '').trim(),\n  cliente:        String(body.cliente ?? 'Não informado').trim(),\n  produto:        String(body.produto ?? 'Não informado').trim(),\n  quantidade:     String(body.quantidade ?? 'Não informado').trim()\n}}];\n"
+      },
+      "id": "91ff944e-c041-464c-9259-f26bd9546ad0",
+      "name": "VALIDAÇÃO CAMPOS",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2800,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://brasilapi.com.br/api/cnpj/v1/' + $json.cnpj }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json",
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "795f06a2-c1c4-414a-a8f4-fd06c2cf29da",
+      "name": "BUSCA CNPJ",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -2560,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c6d7e8f9-a0b1-4cde-d2e3-f4a5b6c7d8e9",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 400,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a4b5c6d7-e8f9-4abc-b0c1-d2e3f4a5b6c7",
+      "name": "CNPJ VÁLIDO?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2440,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\"status\":\"erro\",\"mensagem\":\"CNPJ não encontrado ou inválido na Receita Federal.\"}",
+        "options": {}
+      },
+      "id": "b5c6d7e8-f9a0-4bcd-c1d2-e3f4a5b6c7d8",
+      "name": "RETORNO CNPJ INVÁLIDO",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2440,
+        780
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst src  = $json.body?.cnae_fiscal !== undefined ? $json.body : $json;\nconst lead = $('VALIDAÇÃO CAMPOS').first().json;\n\n// CNAE vem separado: código numérico e descrição em texto\nconst principalCodigo = String(src.cnae_fiscal              ?? '').trim();\nconst principalDesc   = String(src.cnae_fiscal_descricao    ?? '').trim();\nconst secundarios     = Array.isArray(src.cnaes_secundarios) ? src.cnaes_secundarios : [];\nconst secundariosList = secundarios.map(x => `${x.codigo} - ${x.descricao}`).join('\\n');\n\nconst razaoSocial = String(src.razao_social  ?? src.nome_fantasia ?? lead.name).trim();\nconst municipio   = String(src.municipio     ?? '').trim();\nconst uf          = String(src.uf            ?? '').trim();\nconst porte       = String(src.porte         ?? '').trim();\n\nconst cnaeNoteText =\n  `CNAE enriquecido automaticamente pela Márcia\\n` +\n  `Principal: ${principalCodigo} - ${principalDesc}\\n` +\n  `Secundários:\\n${secundariosList || 'Nenhum'}\\n` +\n  `Fonte: BrasilAPI`;\n\nconst resumoLead =\n  `Lead qualificado pela Márcia | Pyramid Diamantados\\n` +\n  `Nome: ${lead.name}\\n` +\n  `Telefone: ${lead.phone}\\n` +\n  `Email: ${lead.email || 'Não informado'}\\n` +\n  `CNPJ: ${lead.cnpj}\\n` +\n  `Razão Social: ${razaoSocial}\\n` +\n  `Município: ${municipio} - ${uf}\\n` +\n  `Porte: ${porte}\\n` +\n  `Perfil: ${lead.cliente}\\n` +\n  `Origem: ${lead.origin}\\n` +\n  `Anúncio/Campanha: ${lead.origem_anuncio}\\n` +\n  `Produto: ${lead.produto}\\n` +\n  `Quantidade: ${lead.quantidade}`;\n\nreturn [{json: {\n  ...lead,\n  razao_social:             razaoSocial,\n  municipio, uf, porte,\n  cnae_principal_codigo:    principalCodigo,\n  cnae_principal_descricao: principalDesc,\n  cnaes_secundarios_lista:  secundariosList,\n  cnae_note_text:           cnaeNoteText,\n  resumo_lead:              resumoLead\n}}];\n"
+      },
+      "id": "0a21cd64-4645-4a4b-ac35-3dbb4e3890fe",
+      "name": "TRATAMENTO CNAE",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2320,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst cnaesValidos = new Set([\"4744001\", \"4744099\", \"4672900\", \"4742300\", \"4679699\", \"4673700\", \"4663000\", \"4744003\", \"4744005\", \"4789099\", \"4642702\", \"4755502\", \"4679601\", \"7739099\", \"4759899\", \"4741500\", \"4661300\", \"4662100\", \"4679604\", \"4669999\", \"7319002\", \"4613300\"]);\nconst principal    = String($json.cnae_principal_codigo ?? '').trim();\nconst secundarios  = String($json.cnaes_secundarios_lista ?? '')\n  .split('\\n').map(l => l.split(' - ')[0].trim()).filter(Boolean);\n\nconst cnaesDoLead  = [principal, ...secundarios].filter(Boolean);\nconst compativeis  = cnaesDoLead.filter(c => cnaesValidos.has(c));\nconst isAprovado   = compativeis.length > 0;\n\nconst mensagemBreakUp =\n  `Oi! Tudo bem? 😊 Aqui é a Márcia, da Pyramid Diamantados!\\n\\n` +\n  `Verifiquei o CNAE da sua empresa e, por enquanto, ele não está dentro dos segmentos que atendemos diretamente.\\n\\n` +\n  `Trabalhamos com empresas dos setores de ferragens, ferramentas, materiais de construção, ` +\n  `material elétrico e equipamentos industriais.\\n\\n` +\n  `Se futuramente atuarem nessas frentes, será um prazer retomar o papo! 😊\\n\\n` +\n  `Abraço e sucesso por aí!\\n— Márcia | Inteligência Comercial Pyramid Diamantados`;\n\nreturn [{json: {\n  ...$json,\n  status: isAprovado ? 'Aprovado' : 'Reprovado',\n  cnaes_compativeis: compativeis,\n  mensagem_break_up: mensagemBreakUp\n}}];\n"
+      },
+      "id": "31cf7f8b-3630-4bd3-bdf5-f7cf6cbf4651",
+      "name": "VALIDADOR CNAE",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2080,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "85167906-f480-4e47-bbba-2bc387c89722",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "Aprovado",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "65c3e660-22f1-4f59-9c36-52c5b9dbbf9d",
+      "name": "CNAE COMPATÍVEL?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1840,
+        592
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\"status\":\"reprovado\",\"mensagem\":{{ JSON.stringify($json.mensagem_break_up) }}}",
+        "options": {}
+      },
+      "id": "1b53b949-72f2-4034-b831-8ef8579ef181",
+      "name": "RETORNO BREAK-UP",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1600,
+        832
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst raw = String($json.origin ?? '').toLowerCase()\n  .normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n\nlet fonte = null, campanha = null, source_id = null, campaign_id = null;\n\nif (/site/.test(raw)) {\n  fonte = 'Site'; campanha = 'Google ADS';\n  source_id = '69669012a9c2ec001349e6df'; campaign_id = '6478e13d8f557c00188e4c7c';\n} else if (/instagram|facebook|ig|fb|redes?.?social/.test(raw)) {\n  fonte = 'Redes Sociais'; campanha = 'Tráfego Pago';\n  source_id = '66d74ce07d2f800014cb003c'; campaign_id = '64b82d4019f6fc001c8c89bb';\n} else if (/google/.test(raw)) {\n  fonte = 'Site'; campanha = 'Google ADS';\n  source_id = '69669012a9c2ec001349e6df'; campaign_id = '6478e13d8f557c00188e4c7c';\n}\n\nreturn [{json: {\n  ...$json,\n  fonte_crm:   fonte,\n  campanha_crm: campanha,\n  source_id,\n  campaign_id,\n  stage_id: '67a0f8b0e4c0d80018789f11'\n}}];\n"
+      },
+      "id": "2f84a35c-afe8-47ec-9e9c-737fe9962e5d",
+      "name": "DEFINIR FONTE E CAMPANHA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1600,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://crm.rdstation.com/api/v1/organizations?token=66d74c65c82fd0001de77377",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $json.razao_social }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "92cfda65-caab-47d3-bc4e-d2964a1a1e7a",
+      "name": "BUSCA EMPRESA NO RD",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1360,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst lead      = $('DEFINIR FONTE E CAMPANHA').first().json;\nconst respOrgs  = $json.body ?? $json;\nconst orgs      = Array.isArray(respOrgs.organizations) ? respOrgs.organizations\n                : Array.isArray(respOrgs) ? respOrgs : [];\n\n// Busca por razão social (normaliza para comparação)\nconst normalize = s => String(s ?? '').trim().toLowerCase()\n  .normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');\n\nconst targetName = normalize(lead.razao_social);\nconst found = orgs.find(o => normalize(o.name) === targetName);\n\nreturn [{json: {\n  ...lead,\n  org_exists:  !!found,\n  org_id:      found ? (found._id ?? found.id) : null,\n  org_name_rd: found ? found.name : null\n}}];\n"
+      },
+      "id": "f93fb59e-5598-4dcc-8688-76ff69276791",
+      "name": "CHECAR EMPRESA EXISTE",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1120,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "da162510-78b9-41e8-ad1f-9a9ccf5fdf64",
+              "leftValue": "={{ $json.org_exists }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "369d3a49-b050-473d-9a55-2bbf3ff59f05",
+      "name": "EMPRESA EXISTE?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -880,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://crm.rdstation.com/api/v1/organizations?token=66d74c65c82fd0001de77377",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"organization\": {\n    \"name\": \"{{ $json.razao_social }}\",\n    \"custom_fields\": [\n      { \"custom_field_id\": \"6799068a27d81f0014427c62\", \"value\": \"{{ $json.cnpj }}\" }\n    ]\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "fb7374db-9f8b-4a7e-a1c7-c603f225b1d6",
+      "name": "CRIAÇÃO EMPRESA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -640,
+        272
+      ],
+      "retryOnFail": true,
+      "waitBetweenTries": 1500,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst lead   = $('CHECAR EMPRESA EXISTE').first().json;\nconst newOrg = $json.body ?? $json;\nconst orgId  = newOrg._id ?? newOrg.id ?? newOrg.organization?._id ?? newOrg.organization?.id;\nreturn [{json: { ...lead, org_id: orgId, org_exists: false }}];\n"
+      },
+      "id": "93236157-33a5-49a0-b92d-c040a897ec37",
+      "name": "EXTRAIR ORG ID NOVO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://crm.rdstation.com/api/v1/contacts?token=66d74c65c82fd0001de77377",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contact\": {\n    \"name\": \"{{ $json.name }}\",\n    \"phones\": [{ \"phone\": \"{{ $json.phone }}\", \"type\": \"work\" }],\n    \"emails\": [{ \"email\": \"{{ $json.email }}\", \"type\": \"work\" }],\n    \"organization_id\": \"{{ $json.org_id }}\"\n  }\n}",
+        "options": {
+          "allowUnauthorizedCerts": true,
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "99f58353-1159-4f5e-b7e7-82b26e83df9d",
+      "name": "CRIAÇÃO CONTATO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        96,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst lead      = $('VALIDAÇÃO CAMPOS').first().json;\nconst cnpjResp  = $('BUSCA CNPJ').first().json;\n\n// $json = output de CRIAÇÃO CONTATO\n// O RD retorna o contato com campo \"organization\" ou \"organization_id\"\nconst contBody  = $json.body ?? $json;\nconst contactId = contBody._id ?? contBody.id ?? contBody.contact?._id;\n\n// Razão social da Receita Federal\nconst razaoSocial = cnpjResp.body?.razao_social ?? cnpjResp.razao_social ?? lead.razao_social ?? '';\n\n// Org ID — pega do contato criado (RD retorna organization._id no response)\nlet orgId = null;\n\n// 1. Do retorno do contato criado (mais confiável — sempre presente)\norgId = contBody.organization?._id \n     ?? contBody.organization?.id\n     ?? contBody.organization_id\n     ?? null;\n\n// 2. Fallback: tenta CHECAR EMPRESA EXISTE\nif (!orgId) {\n  try { const v = $('CHECAR EMPRESA EXISTE').first().json.org_id; if (v) orgId = v; } catch(e) {}\n}\n\n// 3. Fallback: tenta EXTRAIR ORG ID NOVO\nif (!orgId) {\n  try { const v = $('EXTRAIR ORG ID NOVO').first().json.org_id; if (v) orgId = v; } catch(e) {}\n}\n\n// Fonte e Campanha — reutiliza valores já calculados em DEFINIR FONTE E CAMPANHA\nconst fonteCampanha = $('DEFINIR FONTE E CAMPANHA').first().json;\nconst source_id     = fonteCampanha.source_id;\nconst campaign_id   = fonteCampanha.campaign_id;\n\nconst cnaeAprovado = String(lead.cnae_status ?? 'Aprovado').toLowerCase().includes('aprov');\nconst dealName = `${lead.name} | ${razaoSocial} | ${lead.origem_anuncio || lead.origin}`;\n\nreturn [{json: {\n  ...lead,\n  razao_social:  razaoSocial,\n  contact_id:    contactId,\n  org_id:        orgId,\n  deal_name:     dealName,\n  source_id,\n  campaign_id,\n  pipeline_id:   '67a0f6fe0e4c890018795f0f',\n  stage_id:      '67a0f6fe0e4c890018795f12',\n  cnae_aprovado: cnaeAprovado\n}}];\n"
+      },
+      "id": "e0bc651f-405c-4ea4-8bb9-ea6a14e99b63",
+      "name": "MONTAGEM NEGOCIAÇÃO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://crm.rdstation.com/api/v1/deals?token=66d74c65c82fd0001de77377",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"deal\": {\n    \"name\": \"{{ $('MONTAGEM NEGOCIAÇÃO').item.json.deal_name }}\",\n    \"deal_stage_id\": \"{{ $('MONTAGEM NEGOCIAÇÃO').item.json.stage_id }}\",\n    \"deal_pipeline_id\": \"{{ $('MONTAGEM NEGOCIAÇÃO').item.json.pipeline_id }}\",\n    \"description\": \"Produto: {{ $('MONTAGEM NEGOCIAÇÃO').item.json.produto }} | Qtd: {{ $('MONTAGEM NEGOCIAÇÃO').item.json.quantidade }}\"\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "b5351a6d-e197-4df3-a94f-834cb8a76b0e",
+      "name": "CRIAÇÃO NEGOCIAÇÃO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        576,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst raw = $json;\nlet dealId = null;\n\ntry {\n  const body = raw.body ?? raw;\n  const dealBody = typeof body === 'string' ? JSON.parse(body) : body;\n  dealId = dealBody._id ?? dealBody.id ?? dealBody.deal?._id ?? dealBody.deal?.id;\n} catch(e) {}\n\nif (!dealId) dealId = raw._id ?? raw.id ?? null;\n\n// org_id: busca direta com try/catch — cobre tanto empresa nova quanto empresa existente\nlet orgId = null;\ntry { const v = $('EXTRAIR ORG ID NOVO').first().json.org_id; if (v) orgId = v; } catch(e) {}\nif (!orgId) {\n  try { const v = $('CHECAR EMPRESA EXISTE').first().json.org_id; if (v) orgId = v; } catch(e) {}\n}\n\nconst montagem = $('MONTAGEM NEGOCIAÇÃO').first().json;\n\nreturn [{json: {\n  deal_id:     dealId,\n  org_id:      orgId || montagem.org_id || null,\n  campaign_id: montagem.campaign_id,\n  source_id:   montagem.source_id,\n  contact_id:  montagem.contact_id\n}}];\n"
+      },
+      "id": "9304e67f-ab06-47dc-954e-a97c1b5c301f",
+      "name": "EXTRAI DEAL ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://crm.rdstation.com/api/v1/contacts/{{ $('MONTAGEM NEGOCIAÇÃO').item.json.contact_id }}?token=66d74c65c82fd0001de77377",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contact\": {\n    \"deal_ids\": [\"{{ $('CRIAÇÃO NEGOCIAÇÃO').item.json.body._id ?? $('CRIAÇÃO NEGOCIAÇÃO').item.json.body.id }}\"],\n    \"organization_id\": \"{{ $('MONTAGEM NEGOCIAÇÃO').item.json.org_id }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "74e05d3a-a39b-4e99-b87a-be721772c680",
+      "name": "VINCULAR CONTATO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        816,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://crm.rdstation.com/api/v1/deals/{{ $('EXTRAI DEAL ID').item.json.deal_id }}?token=66d74c65c82fd0001de77377",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"deal\": {\n    \"organization_id\": \"{{ $('EXTRAI DEAL ID').item.json.org_id ?? '' }}\"\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "fdf87958-ce07-4261-aa10-ef438ef34d71",
+      "name": "VINCULA EMPRESA AO DEAL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1008,
+        336
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://crm.rdstation.com/api/v1/deals/{{ $('EXTRAI DEAL ID').item.json.deal_id }}?token=66d74c65c82fd0001de77377",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"deal\": {\n    \"campaign_id\": \"{{ $('EXTRAI DEAL ID').item.json.campaign_id }}\",\n    \"deal_source_id\": \"{{ $('EXTRAI DEAL ID').item.json.source_id }}\"\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "abd02bb7-6754-44a5-8cc3-b5c97f811c50",
+      "name": "VINCULA CAMPANHA AO DEAL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1008,
+        544
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://crm.rdstation.com/api/v1/deals/{{ $('EXTRAI DEAL ID').item.json.deal_id }}?token=66d74c65c82fd0001de77377",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  \"deal\": {{\n    \"deal_custom_fields\": [\n      {{\n        \"custom_field_id\": \"69679eefd4522600163e7d62\",\n        \"value\": \"{{{ $('MONTAGEM NEGOCIAÇÃO').item.json.cnae_aprovado ? 'TRUE' : 'FALSE' }}}\"\n      }},\n      {{\n        \"custom_field_id\": \"6799065fed5ae600148a35f2\",\n        \"value\": \"{{{ ['distribuidor','distribuidora'].includes(String($('MONTAGEM NEGOCIAÇÃO').item.json.cliente ?? '').toLowerCase()) ? 'DISTRIBUIDOR' : 'CONSUMIDOR FINAL' }}}\"\n      }}\n    ]\n  }}\n}}",
+        "options": {}
+      },
+      "id": "7eac5b0e-4654-4250-aabd-ee5078e3ea64",
+      "name": "ATUALIZA CAMPOS DEAL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1296,
+        272
+      ],
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://crm.rdstation.com/api/v1/users?token=66d74c65c82fd0001de77377",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c37945af-e117-4ecb-ba9f-43f639aeb401",
+      "name": "BUSCA USUÁRIOS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1056,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Para evitar esta chamada GET /users a cada execução, preencha OWNER_ID_BEATRIZ\n// com o ID fixo encontrado na 1ª execução e o sistema usará o valor fixo.\nconst OWNER_ID_BEATRIZ = ''; // ex: '64b82d4019f6fc001c8c89ba'\nconst OWNER_NAME = 'BEATRIZ';\nconst resp  = $json.users ?? $json;\nconst users = Array.isArray(resp) ? resp : [];\nconst found = users.find(u =>\n  String(u.name ?? u.full_name ?? '').trim().toUpperCase().includes(OWNER_NAME)\n);\nif (!found) throw new Error(`Usuário ${OWNER_NAME} não encontrado no RD Station`);\nreturn [{json: { owner_id: OWNER_ID_BEATRIZ || (found._id ?? found.id), owner_name: found.name ?? found.full_name }}];\n"
+      },
+      "id": "e13769f6-1d5b-4b22-bcca-2d0aa0ce42da",
+      "name": "ENCONTRAR BEATRIZ",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1296,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=https://crm.rdstation.com/api/v1/deals/{{ $('CRIAÇÃO NEGOCIAÇÃO').item.json.body._id ?? $('CRIAÇÃO NEGOCIAÇÃO').item.json.body.id }}?token=66d74c65c82fd0001de77377",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"user_id\": \"{{ $json.owner_id }}\"\n}",
+        "options": {}
+      },
+      "id": "7f8de765-6a4b-490a-9a86-6ed3ce98f762",
+      "name": "ATRIBUIR VENDEDOR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1536,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://crm.rdstation.com/api/v1/activities?token=66d74c65c82fd0001de77377",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "deal_id",
+              "value": "={{ $('CRIAÇÃO NEGOCIAÇÃO').item.json.body._id ?? $('CRIAÇÃO NEGOCIAÇÃO').item.json.body.id }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $('TRATAMENTO CNAE').item.json.cnae_note_text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1e02b477-f75c-4008-ae14-611846356504",
+      "name": "CNAE NA OPORTUNIDADE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1776,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://crm.rdstation.com/api/v1/activities?token=66d74c65c82fd0001de77377",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "deal_id",
+              "value": "={{ $('CRIAÇÃO NEGOCIAÇÃO').item.json.body._id ?? $('CRIAÇÃO NEGOCIAÇÃO').item.json.body.id }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $('TRATAMENTO CNAE').item.json.resumo_lead }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1a7f7817-d64c-4d02-a855-7e6920c86fb7",
+      "name": "RESUMO NA OPORTUNIDADE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2016,
+        432
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={\"status\":\"ok\",\"mensagem\":\"Lead qualificado e cadastrado no RD Station com sucesso!\"}",
+        "options": {}
+      },
+      "id": "876d0369-4564-4429-848d-e9cbb4fe0f6f",
+      "name": "RESPOSTA SUCESSO",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2256,
+        432
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "WEBHOOK ROSANA": {
+      "main": [
+        [
+          {
+            "node": "VALIDAÇÃO CAMPOS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VALIDAÇÃO CAMPOS": {
+      "main": [
+        [
+          {
+            "node": "BUSCA CNPJ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCA CNPJ": {
+      "main": [
+        [
+          {
+            "node": "CNPJ VÁLIDO?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CNPJ VÁLIDO?": {
+      "main": [
+        [
+          {
+            "node": "RETORNO CNPJ INVÁLIDO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "TRATAMENTO CNAE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRATAMENTO CNAE": {
+      "main": [
+        [
+          {
+            "node": "VALIDADOR CNAE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VALIDADOR CNAE": {
+      "main": [
+        [
+          {
+            "node": "CNAE COMPATÍVEL?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CNAE COMPATÍVEL?": {
+      "main": [
+        [
+          {
+            "node": "DEFINIR FONTE E CAMPANHA",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RETORNO BREAK-UP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DEFINIR FONTE E CAMPANHA": {
+      "main": [
+        [
+          {
+            "node": "BUSCA EMPRESA NO RD",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCA EMPRESA NO RD": {
+      "main": [
+        [
+          {
+            "node": "CHECAR EMPRESA EXISTE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CHECAR EMPRESA EXISTE": {
+      "main": [
+        [
+          {
+            "node": "EMPRESA EXISTE?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EMPRESA EXISTE?": {
+      "main": [
+        [
+          {
+            "node": "CRIAÇÃO CONTATO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CRIAÇÃO EMPRESA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRIAÇÃO EMPRESA": {
+      "main": [
+        [
+          {
+            "node": "EXTRAIR ORG ID NOVO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EXTRAIR ORG ID NOVO": {
+      "main": [
+        [
+          {
+            "node": "CRIAÇÃO CONTATO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRIAÇÃO CONTATO": {
+      "main": [
+        [
+          {
+            "node": "MONTAGEM NEGOCIAÇÃO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MONTAGEM NEGOCIAÇÃO": {
+      "main": [
+        [
+          {
+            "node": "CRIAÇÃO NEGOCIAÇÃO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CRIAÇÃO NEGOCIAÇÃO": {
+      "main": [
+        [
+          {
+            "node": "EXTRAI DEAL ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EXTRAI DEAL ID": {
+      "main": [
+        [
+          {
+            "node": "VINCULA EMPRESA AO DEAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VINCULA EMPRESA AO DEAL": {
+      "main": [
+        [
+          {
+            "node": "VINCULA CAMPANHA AO DEAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VINCULA CAMPANHA AO DEAL": {
+      "main": [
+        [
+          {
+            "node": "ATUALIZA CAMPOS DEAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ATUALIZA CAMPOS DEAL": {
+      "main": [
+        [
+          {
+            "node": "VINCULAR CONTATO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VINCULAR CONTATO": {
+      "main": [
+        [
+          {
+            "node": "BUSCA USUÁRIOS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "BUSCA USUÁRIOS": {
+      "main": [
+        [
+          {
+            "node": "ENCONTRAR BEATRIZ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ENCONTRAR BEATRIZ": {
+      "main": [
+        [
+          {
+            "node": "ATRIBUIR VENDEDOR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ATRIBUIR VENDEDOR": {
+      "main": [
+        [
+          {
+            "node": "CNAE NA OPORTUNIDADE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CNAE NA OPORTUNIDADE": {
+      "main": [
+        [
+          {
+            "node": "RESUMO NA OPORTUNIDADE",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RESUMO NA OPORTUNIDADE": {
+      "main": [
+        [
+          {
+            "node": "RESPOSTA SUCESSO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "ed42b65a-35c4-4af7-bbb6-932234ab5729",
+  "meta": {
+    "instanceId": "5c255c44e0067903fbf9a4cb8691e3c7bc16045d66e7692d0f622556aeaa96d2"
+  },
+  "id": "HpXr2Q42CFqi327i",
+  "tags": []
+}
