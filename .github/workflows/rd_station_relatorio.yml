@@ -1,0 +1,42 @@
+name: Relatorio Diario RD Station
+
+on:
+  schedule:
+    # 8h BRT = 11h UTC (horario de Brasilia UTC-3)
+    - cron: '0 11 * * *'
+  workflow_dispatch:  # permite rodar manualmente pelo GitHub
+
+jobs:
+  gerar-relatorio:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependencias
+        run: pip install requests python-dotenv APScheduler jinja2 pandas openpyxl
+
+      - name: Executar automacao RD Station
+        env:
+          RD_STATION_API_KEY: ${{ secrets.RD_STATION_API_KEY }}
+          EMAIL_DESTINO: ${{ secrets.EMAIL_DESTINO }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          PYTHONIOENCODING: utf-8
+        run: python scripts/automatizar_relatorios.py
+
+      - name: Salvar relatorio gerado como artefato
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: relatorio-leads-${{ github.run_number }}
+          path: data/output/*.xlsx
+          retention-days: 30

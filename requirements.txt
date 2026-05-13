@@ -1,4 +1,3 @@
-
 streamlit>=1.25.0,<2.0.0
 pandas>=2.0.0
 plotly>=5.15.0
@@ -10,9 +9,8 @@ python-dotenv>=1.0.0
 watchdog>=3.0.0
 bcrypt>=4.0.1
 PyYAML>=6.0.1
-openai
-xlsxwriter
 
-# Recomendado (mas opcional):
-bcrypt>=4.0.1        # Usado internamente pelo streamlit-authenticator
-PyYAML>=6.0.1        # Usado pelo streamlit-authenticator
+# Novas dependências para RD Station
+requests>=2.31.0       # Para chamadas HTTP à API do RD Station
+APScheduler>=3.10.4    # Para agendamento de tarefas diárias
+jinja2>=3.1.2          # Para templates de email
