@@ -84,29 +84,49 @@ class EmailAutomator:
         self,
         destinatarios: List[str],
         corpo_html: str,
-        arquivo_excel: Optional[str] = None
+        arquivo_excel: Optional[str] = None,
+        assunto: Optional[str] = None,
+        anexos_extras: Optional[List[str]] = None,
     ) -> bool:
-        """
-        Envia relatório RD Station por email.
-
-        Args:
-            destinatarios: Lista de emails
-            corpo_html: HTML do relatório
-            arquivo_excel: (Opcional) Caminho do arquivo Excel
-
-        Returns:
-            True se enviado com sucesso
-        """
+        """Envia relatorio RD Station com ate N anexos."""
         data_atual = datetime.now().strftime("%d/%m/%Y")
-        assunto = f"Relatorio de Leads - RD Station - {data_atual}"
+        assunto = assunto or f"Relatorio de Leads - RD Station - {data_atual}"
 
-        return self.enviar_email(
-            destinatarios=destinatarios,
-            assunto=assunto,
-            corpo_html=corpo_html,
-            anexo_path=arquivo_excel,
-            nome_anexo=f"relatorio_leads_{data_atual.replace('/', '-')}.xlsx"
-        )
+        try:
+            msg = MIMEMultipart('mixed')
+            msg['Subject'] = assunto
+            msg['From'] = self.email_user
+            msg['To'] = ', '.join(destinatarios)
+
+            msg.attach(MIMEText(corpo_html, 'html', 'utf-8'))
+
+            todos_anexos = []
+            if arquivo_excel:
+                todos_anexos.append(arquivo_excel)
+            if anexos_extras:
+                todos_anexos.extend(anexos_extras)
+
+            for path in todos_anexos:
+                if path and os.path.exists(path):
+                    with open(path, 'rb') as f:
+                        part = MIMEApplication(f.read(), Name=os.path.basename(path))
+                    part['Content-Disposition'] = f'attachment; filename="{os.path.basename(path)}"'
+                    msg.attach(part)
+
+            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+                server.starttls()
+                server.login(self.email_user, self.email_password)
+                server.send_message(msg)
+
+            print(f"OK: Email enviado para {', '.join(destinatarios)} ({len(todos_anexos)} anexo(s))")
+            return True
+
+        except smtplib.SMTPAuthenticationError:
+            print("ERRO: Autenticacao SMTP falhou. Verifique email e senha.")
+            return False
+        except Exception as e:
+            print(f"ERRO: {e}")
+            return False
 
 def get_email_client() -> EmailAutomator:
     """

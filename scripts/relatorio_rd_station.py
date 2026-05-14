@@ -1,409 +1,511 @@
-import pandas as pd
+import os
+from datetime import datetime, timedelta
+from typing import Dict, List
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from openpyxl.utils.dataframe import dataframe_to_rows
-from datetime import datetime
-import os
-from typing import Dict, Tuple
-from jinja2 import Template
+from openpyxl.utils import get_column_letter
 
-def gerar_relatorio_excel(snapshot_data: Dict, movements_data: Dict, filepath: str) -> None:
-    """
-    Gera relatório Excel com dados de leads e movimentações.
 
-    Args:
-        snapshot_data: Dict com snapshot de leads {funnel: {stage: count}}
-        movements_data: Dict com movimentações {funnel: {stage: {type: movement_type, change: quantity}}}
-        filepath: Caminho para salvar o arquivo Excel
-    """
+# ===== HELPERS DE ESTILO =====
+
+def _fill(hex_color: str) -> PatternFill:
+    return PatternFill(start_color=hex_color, end_color=hex_color, fill_type="solid")
+
+def _font(bold=False, color="000000", size=11, italic=False) -> Font:
+    return Font(bold=bold, color=color, size=size, italic=italic)
+
+def _border() -> Border:
+    s = Side(style='thin')
+    return Border(left=s, right=s, top=s, bottom=s)
+
+def _center() -> Alignment:
+    return Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+def _left() -> Alignment:
+    return Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+def _header_row(ws, linha: int, headers: List[str], bg="1F4E79"):
+    for col, h in enumerate(headers, 1):
+        c = ws.cell(row=linha, column=col, value=h)
+        c.fill = _fill(bg)
+        c.font = _font(bold=True, color="FFFFFF")
+        c.border = _border()
+        c.alignment = _center()
+
+def _data_row(ws, linha: int, valores: List, bg=None):
+    alt_bg = "F2F2F2" if linha % 2 == 0 else "FFFFFF"
+    fill = _fill(bg or alt_bg)
+    for col, v in enumerate(valores, 1):
+        c = ws.cell(row=linha, column=col, value=v)
+        c.fill = fill
+        c.border = _border()
+        c.alignment = _center() if col > 1 else _left()
+
+def _ajustar_colunas(ws, min_w=12, max_w=45):
+    for col in ws.columns:
+        w = min_w
+        for cell in col:
+            if cell.value:
+                w = max(w, min(len(str(cell.value)) + 3, max_w))
+        ws.column_dimensions[col[0].column_letter].width = w
+
+def _titulo(ws, texto: str, subtitulo: str = ""):
+    ws['A1'] = texto
+    ws['A1'].font = _font(bold=True, size=14, color="1F4E79")
+    ws['A2'] = subtitulo or f"Gerado em: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+    ws['A2'].font = _font(italic=True, size=10, color="666666")
+
+def _kpi(ws, linha: int, label: str, valor, col=1, cor_valor="1F4E79"):
+    ws.cell(row=linha, column=col, value=label).font = _font(bold=True, size=10, color="555555")
+    c = ws.cell(row=linha, column=col + 1, value=valor)
+    c.font = _font(bold=True, size=12, color=cor_valor)
+
+def _moeda(v) -> str:
+    try:
+        return f"R$ {float(v):,.2f}"
+    except (TypeError, ValueError):
+        return "R$ 0,00"
+
+
+# ===== RELATÓRIO 1: COMERCIAL OPERACIONAL =====
+
+def gerar_relatorio_comercial_operacional(
+    snapshot: Dict[str, Dict[str, int]],
+    vendedores: List[Dict],
+    finalizados: Dict,
+    funis_comercial: Dict[str, str],
+    filepath: str,
+) -> None:
+    """4 abas: Resumo, Por Vendedor, Em Andamento, Finalizados."""
     wb = Workbook()
     wb.remove(wb.active)
 
-    # Configurações de estilo
-    header_fill = PatternFill(start_color="1F77B4", end_color="1F77B4", fill_type="solid")
-    header_font = Font(bold=True, color="FFFFFF", size=12)
-    subheader_fill = PatternFill(start_color="D9E8F5", end_color="D9E8F5", fill_type="solid")
-    subheader_font = Font(bold=True, size=11)
-    border = Border(
-        left=Side(style='thin'),
-        right=Side(style='thin'),
-        top=Side(style='thin'),
-        bottom=Side(style='thin')
-    )
-    center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    left_align = Alignment(horizontal="left", vertical="center")
+    # ---- ABA 1: RESUMO ----
+    ws = wb.create_sheet("Resumo")
+    _titulo(ws, "COMERCIAL OPERACIONAL - RESUMO")
 
-    # === ABA 1: RESUMO ===
-    ws_resumo = wb.create_sheet("Resumo", 0)
-
-    data_geracao = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-    ws_resumo['A1'] = "RELATÓRIO DE LEADS - RD STATION"
-    ws_resumo['A1'].font = Font(bold=True, size=14, color="1F77B4")
-    ws_resumo['A2'] = f"Data: {data_geracao}"
-    ws_resumo['A2'].font = Font(italic=True, size=10)
+    total_andamento = sum(v['em_andamento'] for v in vendedores)
+    total_criadas = sum(v.get('criadas', v['em_andamento'] + v['ganhos_3m'] + v['perdidos_3m']) for v in vendedores)
+    total_ganhos = sum(v['ganhos_3m'] for v in vendedores)
+    total_perdidos = sum(v['perdidos_3m'] for v in vendedores)
+    total_valor = sum(v['valor_ganhos_3m'] for v in vendedores)
 
     linha = 4
-
-    # KPI Total de Leads
-    total_leads = sum(sum(stages.values()) for stages in snapshot_data.values())
-    ws_resumo[f'A{linha}'] = "TOTAL DE LEADS:"
-    ws_resumo[f'A{linha}'].font = subheader_font
-    ws_resumo[f'B{linha}'] = total_leads
-    ws_resumo[f'B{linha}'].font = Font(bold=True, size=12, color="006100")
-    linha += 2
-
-    # Por funil
-    ws_resumo[f'A{linha}'] = "DISTRIBUIÇÃO POR FUNIL:"
-    ws_resumo[f'A{linha}'].font = subheader_font
+    ws.cell(row=linha, column=1, value="INDICADORES (ultimos 3 meses)").font = _font(bold=True, size=12, color="1F4E79")
     linha += 1
 
-    col_headers = ['Funil', 'Total de Leads']
-    for col_idx, header in enumerate(col_headers, 1):
-        cell = ws_resumo.cell(row=linha, column=col_idx)
-        cell.value = header
-        cell.fill = subheader_fill
-        cell.font = subheader_font
-        cell.border = border
-        cell.alignment = center_align
+    kpis = [
+        ("Criadas (andamento + ganhos + perdidos)", total_criadas, "1F4E79"),
+        ("Em Andamento (estado atual)", total_andamento, "1F4E79"),
+        ("Ganhos - ultimos 3 meses", total_ganhos, "006100"),
+        ("Perdidos - ultimos 3 meses", total_perdidos, "C00000"),
+        ("Valor Ganhos 3m", _moeda(total_valor), "006100"),
+    ]
+    for label, valor, cor in kpis:
+        _kpi(ws, linha, label, valor, col=1, cor_valor=cor)
+        linha += 1
 
     linha += 1
-
-    for funnel_name, stages in sorted(snapshot_data.items()):
-        total_funnel = sum(stages.values())
-        ws_resumo.cell(row=linha, column=1).value = funnel_name
-        ws_resumo.cell(row=linha, column=2).value = total_funnel
-        for col in [1, 2]:
-            ws_resumo.cell(row=linha, column=col).border = border
-            ws_resumo.cell(row=linha, column=col).alignment = center_align
-        linha += 1
-
-    # === ABA 2: LEADS POR FUNIL ===
-    ws_leads = wb.create_sheet("Leads por Funil", 1)
-    ws_leads['A1'] = "LEADS POR ESTÁGIO DO FUNIL"
-    ws_leads['A1'].font = Font(bold=True, size=14, color="1F77B4")
-
-    linha = 3
-    for funnel_name, stages in sorted(snapshot_data.items()):
-        ws_leads[f'A{linha}'] = f"📊 {funnel_name.upper()}"
-        ws_leads[f'A{linha}'].font = subheader_font
-        ws_leads[f'A{linha}'].fill = subheader_fill
-        linha += 1
-
-        # Cabeçalho da tabela
-        headers = ['Estágio', 'Quantidade de Leads']
-        for col_idx, header in enumerate(headers, 1):
-            cell = ws_leads.cell(row=linha, column=col_idx)
-            cell.value = header
-            cell.fill = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")
-            cell.font = Font(bold=True)
-            cell.border = border
-            cell.alignment = center_align
-
-        linha += 1
-
-        # Dados dos estágios
-        for stage_name, count in sorted(stages.items()):
-            ws_leads.cell(row=linha, column=1).value = stage_name
-            ws_leads.cell(row=linha, column=2).value = count
-            for col in [1, 2]:
-                ws_leads.cell(row=linha, column=col).border = border
-                ws_leads.cell(row=linha, column=col).alignment = center_align
+    ws.cell(row=linha, column=1, value="FINALIZADOS POR FUNIL (ultimos 3 meses)").font = _font(bold=True, size=12, color="1F4E79")
+    linha += 1
+    _header_row(ws, linha, ["Funil", "Ganhos", "Valor Ganhos (R$)", "Perdidos"])
+    linha += 1
+    for nome_funil, dados in finalizados.items():
+        if nome_funil in funis_comercial:
+            _data_row(ws, linha, [
+                nome_funil,
+                dados['won']['count'],
+                _moeda(dados['won']['value']),
+                dados['lost']['count'],
+            ])
             linha += 1
 
+    _ajustar_colunas(ws)
+
+    # ---- ABA 2: POR VENDEDOR ----
+    ws2 = wb.create_sheet("Por Vendedor")
+    _titulo(ws2, "COMERCIAL - POR VENDEDOR")
+
+    linha = 4
+    _header_row(ws2, linha, ["Vendedor", "Criadas", "Em Andamento", "Ganhos 3m", "Perdidos 3m", "Valor Ganhos 3m (R$)"])
+    linha += 1
+    for v in vendedores:
+        criadas = v.get('criadas', v['em_andamento'] + v['ganhos_3m'] + v['perdidos_3m'])
+        _data_row(ws2, linha, [
+            v['vendedor'],
+            criadas,
+            v['em_andamento'],
+            v['ganhos_3m'],
+            v['perdidos_3m'],
+            _moeda(v['valor_ganhos_3m']),
+        ])
         linha += 1
 
-    # === ABA 3: MOVIMENTAÇÕES ===
-    ws_mov = wb.create_sheet("Movimentações", 2)
-    ws_mov['A1'] = "MOVIMENTAÇÕES DE LEADS"
-    ws_mov['A1'].font = Font(bold=True, size=14, color="1F77B4")
+    _ajustar_colunas(ws2)
 
-    linha = 3
-    headers = ['Funil', 'Estágio', 'Tipo', 'Quantidade']
-    for col_idx, header in enumerate(headers, 1):
-        cell = ws_mov.cell(row=linha, column=col_idx)
-        cell.value = header
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.border = border
-        cell.alignment = center_align
+    # ---- ABA 3: EM ANDAMENTO (a partir da 2a etapa) ----
+    ws3 = wb.create_sheet("Em Andamento")
+    _titulo(ws3, "COMERCIAL - LEADS EM ANDAMENTO")
+    ws3['A2'] = "Leads a partir da 2a etapa de cada funil comercial"
+    ws3['A2'].font = _font(italic=True, size=10, color="666666")
 
+    linha = 4
+    _header_row(ws3, linha, ["Funil", "Estagio", "Quantidade"])
     linha += 1
 
-    has_movements = False
-    for funnel_name, stages in sorted(movements_data.items()):
-        for stage_name, movement in sorted(stages.items()):
-            has_movements = True
-            movement_type = movement.get('type', 'unknown')
-            quantity = movement.get('change', movement.get('count', 0))
-
-            # Traduzir tipos
-            type_map = {
-                'advancement': '📈 Avanço',
-                'regression': '📉 Retrocesso',
-                'exit': '❌ Saída'
-            }
-            tipo_display = type_map.get(movement_type, movement_type)
-
-            # Colorir por tipo
-            if movement_type == 'advancement':
-                color_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
-            elif movement_type == 'regression':
-                color_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
-            else:
-                color_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
-
-            ws_mov.cell(row=linha, column=1).value = funnel_name
-            ws_mov.cell(row=linha, column=2).value = stage_name
-            ws_mov.cell(row=linha, column=3).value = tipo_display
-            ws_mov.cell(row=linha, column=4).value = quantity
-
-            for col in range(1, 5):
-                cell = ws_mov.cell(row=linha, column=col)
-                cell.fill = color_fill
-                cell.border = border
-                cell.alignment = center_align
-
+    for funil_nome in funis_comercial:
+        if funil_nome not in snapshot:
+            continue
+        stages = list(snapshot[funil_nome].items())
+        for i, (stage_name, count) in enumerate(stages):
+            if i == 0:
+                continue  # pula primeira etapa
+            _data_row(ws3, linha, [funil_nome, stage_name, count])
             linha += 1
 
-    if not has_movements:
-        ws_mov['A4'] = "Nenhuma movimentação detectada"
-        ws_mov['A4'].font = Font(italic=True, color="999999")
+    _ajustar_colunas(ws3)
 
-    # Ajustar largura das colunas
-    for ws in [ws_resumo, ws_leads, ws_mov]:
-        for column in ws.columns:
-            max_length = 0
-            column_letter = column[0].column_letter
-            for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
-            adjusted_width = min(max_length + 2, 50)
-            ws.column_dimensions[column_letter].width = adjusted_width
+    # ---- ABA 4: FINALIZADOS ----
+    ws4 = wb.create_sheet("Finalizados")
+    _titulo(ws4, "COMERCIAL - FINALIZADOS (ultimos 3 meses)")
+
+    linha = 4
+    _header_row(ws4, linha, ["Funil", "Status", "Quantidade", "Valor Total (R$)"])
+    linha += 1
+
+    for nome_funil, dados in finalizados.items():
+        if nome_funil not in funis_comercial:
+            continue
+        c_won = ws4.cell(row=linha, column=1, value=nome_funil)
+        c_won.border = _border(); c_won.alignment = _left()
+        c_won.fill = _fill("FFFFFF" if linha % 2 == 0 else "F2F2F2")
+
+        for col, v in enumerate(["Ganho", dados['won']['count'], _moeda(dados['won']['value'])], 2):
+            c = ws4.cell(row=linha, column=col, value=v)
+            c.border = _border(); c.alignment = _center()
+            c.fill = _fill("E2EFDA")
+            if col == 2:
+                c.font = _font(color="006100", bold=True)
+        linha += 1
+
+        c_lost = ws4.cell(row=linha, column=1, value=nome_funil)
+        c_lost.border = _border(); c_lost.alignment = _left()
+        c_lost.fill = _fill("FFFFFF" if linha % 2 == 0 else "F2F2F2")
+        for col, v in enumerate(["Perdido", dados['lost']['count'], "—"], 2):
+            c = ws4.cell(row=linha, column=col, value=v)
+            c.border = _border(); c.alignment = _center()
+            c.fill = _fill("FFDCE1")
+            if col == 2:
+                c.font = _font(color="C00000", bold=True)
+        linha += 1
+
+    _ajustar_colunas(ws4)
 
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     wb.save(filepath)
+    print(f"   Salvo: {filepath}")
 
-def gerar_email_html(snapshot_data: Dict, movements_data: Dict) -> str:
-    """
-    Gera HTML para envio de email com resumo de leads.
 
-    Args:
-        snapshot_data: Dict com snapshot de leads
-        movements_data: Dict com movimentações
+# ===== RELATÓRIO 2: COMERCIAL CONVERSÃO =====
 
-    Returns:
-        String com HTML do email
-    """
-    total_leads = sum(sum(stages.values()) for stages in snapshot_data.values())
+def gerar_relatorio_comercial_conversao(
+    snapshot: Dict[str, Dict[str, int]],
+    taxas: Dict[str, List[Dict]],
+    funis_comercial: Dict[str, str],
+    filepath: str,
+) -> None:
+    """2 abas: Taxa de Conversão, Gargalos."""
+    wb = Workbook()
+    wb.remove(wb.active)
 
-    template_str = """
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                color: #333;
-                background-color: #f5f5f5;
-            }
-            .container {
-                max-width: 800px;
-                margin: 0 auto;
-                background-color: #fff;
-                padding: 20px;
-                border-radius: 5px;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            }
-            .header {
-                background-color: #1f77b4;
-                color: white;
-                padding: 20px;
-                border-radius: 5px;
-                text-align: center;
-                margin-bottom: 20px;
-            }
-            .header h1 {
-                margin: 0;
-                font-size: 28px;
-            }
-            .header p {
-                margin: 5px 0 0 0;
-                font-size: 14px;
-                opacity: 0.9;
-            }
-            .kpi {
-                display: inline-block;
-                background-color: #f0f0f0;
-                padding: 15px 25px;
-                margin: 10px 5px;
-                border-radius: 5px;
-                text-align: center;
-                border-left: 4px solid #1f77b4;
-            }
-            .kpi .number {
-                font-size: 32px;
-                font-weight: bold;
-                color: #1f77b4;
-            }
-            .kpi .label {
-                font-size: 12px;
-                color: #666;
-                margin-top: 5px;
-            }
-            .section {
-                margin: 20px 0;
-            }
-            .section-title {
-                background-color: #1f77b4;
-                color: white;
-                padding: 10px 15px;
-                border-radius: 3px;
-                font-weight: bold;
-                margin-bottom: 10px;
-            }
-            table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-bottom: 20px;
-            }
-            th {
-                background-color: #e7e6e6;
-                padding: 10px;
-                text-align: left;
-                font-weight: bold;
-                border-bottom: 2px solid #1f77b4;
-            }
-            td {
-                padding: 10px;
-                border-bottom: 1px solid #ddd;
-            }
-            tr:hover {
-                background-color: #f9f9f9;
-            }
-            .advancement { color: green; }
-            .regression { color: red; }
-            .exit { color: orange; }
-            .footer {
-                text-align: center;
-                color: #999;
-                font-size: 12px;
-                margin-top: 30px;
-                padding-top: 20px;
-                border-top: 1px solid #ddd;
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1>📊 Relatório de Leads - RD Station</h1>
-                <p>{{ data_geracao }}</p>
-            </div>
+    # ---- ABA 1: TAXA DE CONVERSÃO ----
+    ws = wb.create_sheet("Taxa de Conversao")
+    _titulo(ws, "COMERCIAL - TAXA DE CONVERSAO ENTRE ESTAGIOS")
 
-            <div style="text-align: center;">
-                <div class="kpi">
-                    <div class="number">{{ total_leads }}</div>
-                    <div class="label">Total de Leads</div>
-                </div>
-            </div>
+    linha = 4
+    _header_row(ws, linha, ["Funil", "Estagio", "Leads", "Proximo Estagio", "Leads Proximo", "Conversao (%)"])
+    linha += 1
 
-            <div class="section">
-                <div class="section-title">📈 Distribuição por Funil</div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Funil</th>
-                            <th style="text-align: center;">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for funnel_name, stages in snapshot_data.items() | sort %}
-                        <tr>
-                            <td>{{ funnel_name }}</td>
-                            <td style="text-align: center;"><strong>{{ stages.values() | sum }}</strong></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+    for funil_nome in funis_comercial:
+        if funil_nome not in taxas:
+            continue
+        for etapa in taxas[funil_nome]:
+            taxa = etapa['taxa_pct']
+            if taxa is None:
+                bg = "D9D9D9"
+            elif taxa >= 50:
+                bg = "C6EFCE"  # verde
+            elif taxa >= 20:
+                bg = "FFEB9C"  # amarelo
+            else:
+                bg = "FFC7CE"  # vermelho
 
-            <div class="section">
-                <div class="section-title">🎯 Leads por Estágio</div>
-                {% for funnel_name, stages in snapshot_data.items() | sort %}
-                <h4>{{ funnel_name }}</h4>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Estágio</th>
-                            <th style="text-align: center;">Quantidade</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for stage_name, count in stages.items() | sort %}
-                        <tr>
-                            <td>{{ stage_name }}</td>
-                            <td style="text-align: center;"><strong>{{ count }}</strong></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% endfor %}
-            </div>
+            valores = [
+                funil_nome,
+                etapa['estagio'],
+                etapa['count'],
+                etapa['proximo_estagio'] or "—",
+                etapa['proximo_count'] if etapa['proximo_count'] is not None else "—",
+                f"{taxa}%" if taxa is not None else "—",
+            ]
+            for col, v in enumerate(valores, 1):
+                c = ws.cell(row=linha, column=col, value=v)
+                c.fill = _fill(bg)
+                c.border = _border()
+                c.alignment = _left() if col == 1 else _center()
+            linha += 1
 
-            {% if movements_data %}
-            <div class="section">
-                <div class="section-title">⚡ Movimentações Detectadas</div>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Funil</th>
-                            <th>Estágio</th>
-                            <th>Tipo</th>
-                            <th style="text-align: center;">Quantidade</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for funnel_name, stages in movements_data.items() | sort %}
-                            {% for stage_name, movement in stages.items() | sort %}
-                            <tr>
-                                <td>{{ funnel_name }}</td>
-                                <td>{{ stage_name }}</td>
-                                <td class="{% if movement.type == 'advancement' %}advancement{% elif movement.type == 'regression' %}regression{% else %}exit{% endif %}">
-                                    {% if movement.type == 'advancement' %}
-                                        📈 Avanço
-                                    {% elif movement.type == 'regression' %}
-                                        📉 Retrocesso
-                                    {% else %}
-                                        ❌ Saída
-                                    {% endif %}
-                                </td>
-                                <td style="text-align: center;"><strong>{{ movement.change or movement.count }}</strong></td>
-                            </tr>
-                            {% endfor %}
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% endif %}
+    # Legenda
+    linha += 1
+    ws.cell(row=linha, column=1, value="Legenda de cores:").font = _font(bold=True)
+    linha += 1
+    for cor, texto in [("C6EFCE", "Verde: conversao >= 50%"), ("FFEB9C", "Amarelo: conversao entre 20% e 49%"), ("FFC7CE", "Vermelho: conversao < 20%")]:
+        c = ws.cell(row=linha, column=1, value=texto)
+        c.fill = _fill(cor)
+        c.border = _border()
+        linha += 1
 
-            <div class="footer">
-                <p>Relatório gerado automaticamente pelo Sistema de Automação - RD Station</p>
-                <p>Dúvidas? Entre em contato com o time de análise de vendas</p>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
+    _ajustar_colunas(ws)
 
-    template = Template(template_str)
-    html = template.render(
-        data_geracao=datetime.now().strftime("%d/%m/%Y às %H:%M:%S"),
-        total_leads=total_leads,
-        snapshot_data=snapshot_data,
-        movements_data=movements_data
+    # ---- ABA 2: GARGALOS ----
+    ws2 = wb.create_sheet("Gargalos")
+    _titulo(ws2, "COMERCIAL - GARGALOS DO FUNIL")
+    ws2['A2'] = "Estagios com mais leads acumulados e menor taxa de saida"
+    ws2['A2'].font = _font(italic=True, size=10, color="666666")
+
+    gargalos = []
+    for funil_nome in funis_comercial:
+        if funil_nome not in taxas:
+            continue
+        for etapa in taxas[funil_nome]:
+            if etapa['taxa_pct'] is not None and etapa['taxa_pct'] < 30 and etapa['count'] > 0:
+                gargalos.append({
+                    'funil': funil_nome,
+                    'estagio': etapa['estagio'],
+                    'leads': etapa['count'],
+                    'taxa': etapa['taxa_pct'],
+                })
+
+    gargalos.sort(key=lambda x: (-x['leads'], x['taxa']))
+
+    linha = 4
+    _header_row(ws2, linha, ["Funil", "Estagio (Gargalo)", "Leads Acumulados", "Taxa de Saida (%)"])
+    linha += 1
+
+    if gargalos:
+        for g in gargalos:
+            _data_row(ws2, linha, [g['funil'], g['estagio'], g['leads'], f"{g['taxa']}%"])
+            linha += 1
+    else:
+        ws2.cell(row=linha, column=1, value="Nenhum gargalo critico identificado (taxa < 30%)").font = _font(italic=True, color="666666")
+
+    _ajustar_colunas(ws2)
+
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    wb.save(filepath)
+    print(f"   Salvo: {filepath}")
+
+
+# ===== RELATÓRIO 3: MARKETING =====
+
+def gerar_relatorio_marketing(
+    snapshot: Dict[str, Dict[str, int]],
+    vendedores_mkt: List[Dict],
+    finalizados_mkt: Dict,
+    taxas_mkt: Dict[str, List[Dict]],
+    funis_marketing: Dict[str, str],
+    filepath: str,
+) -> None:
+    """4 abas: Resumo, Por Vendedor, Jornada no Funil, Finalizados."""
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    # ---- ABA 1: RESUMO ----
+    ws = wb.create_sheet("Resumo")
+    _titulo(ws, "MARKETING - FUNIL DE CLIENTES NOVOS")
+
+    total_andamento = sum(v['em_andamento'] for v in vendedores_mkt)
+    total_ganhos = sum(v['ganhos_3m'] for v in vendedores_mkt)
+    total_perdidos = sum(v['perdidos_3m'] for v in vendedores_mkt)
+    total_valor = sum(v['valor_ganhos_3m'] for v in vendedores_mkt)
+    total_leads_funil = sum(sum(snapshot.get(f, {}).values()) for f in funis_marketing)
+
+    linha = 4
+    ws.cell(row=linha, column=1, value="INDICADORES (ultimos 3 meses)").font = _font(bold=True, size=12, color="1F4E79")
+    linha += 1
+    kpis = [
+        ("Total no Funil (atual)", total_leads_funil, "1F4E79"),
+        ("Leads em Andamento", total_andamento, "1F4E79"),
+        ("Ganhos", total_ganhos, "006100"),
+        ("Perdidos", total_perdidos, "C00000"),
+        ("Valor Ganhos", _moeda(total_valor), "006100"),
+    ]
+    for label, valor, cor in kpis:
+        _kpi(ws, linha, label, valor, cor_valor=cor)
+        linha += 1
+
+    _ajustar_colunas(ws)
+
+    # ---- ABA 2: POR VENDEDOR ----
+    ws2 = wb.create_sheet("Por Vendedor")
+    _titulo(ws2, "MARKETING - POR VENDEDOR")
+
+    linha = 4
+    _header_row(ws2, linha, ["Vendedor", "Em Andamento", "Ganhos 3m", "Perdidos 3m", "Valor Ganhos 3m (R$)"])
+    linha += 1
+    for v in vendedores_mkt:
+        _data_row(ws2, linha, [
+            v['vendedor'],
+            v['em_andamento'],
+            v['ganhos_3m'],
+            v['perdidos_3m'],
+            _moeda(v['valor_ganhos_3m']),
+        ])
+        linha += 1
+
+    _ajustar_colunas(ws2)
+
+    # ---- ABA 3: JORNADA NO FUNIL ----
+    ws3 = wb.create_sheet("Jornada no Funil")
+    _titulo(ws3, "MARKETING - JORNADA NO FUNIL")
+
+    linha = 4
+    _header_row(ws3, linha, ["Funil", "Estagio", "Leads", "Proximo Estagio", "Leads Proximo", "Conversao (%)"])
+    linha += 1
+
+    for funil_nome in funis_marketing:
+        if funil_nome not in taxas_mkt:
+            continue
+        for etapa in taxas_mkt[funil_nome]:
+            taxa = etapa['taxa_pct']
+            bg = "C6EFCE" if (taxa or 0) >= 50 else ("FFEB9C" if (taxa or 0) >= 20 else ("FFC7CE" if taxa is not None else "D9D9D9"))
+            valores = [
+                funil_nome,
+                etapa['estagio'],
+                etapa['count'],
+                etapa['proximo_estagio'] or "—",
+                etapa['proximo_count'] if etapa['proximo_count'] is not None else "—",
+                f"{taxa}%" if taxa is not None else "—",
+            ]
+            for col, v in enumerate(valores, 1):
+                c = ws3.cell(row=linha, column=col, value=v)
+                c.fill = _fill(bg)
+                c.border = _border()
+                c.alignment = _left() if col == 1 else _center()
+            linha += 1
+
+    _ajustar_colunas(ws3)
+
+    # ---- ABA 4: FINALIZADOS ----
+    ws4 = wb.create_sheet("Finalizados")
+    _titulo(ws4, "MARKETING - FINALIZADOS (ultimos 3 meses)")
+
+    linha = 4
+    _header_row(ws4, linha, ["Funil", "Status", "Quantidade", "Valor Total (R$)"])
+    linha += 1
+
+    for nome_funil, dados in finalizados_mkt.items():
+        for col, v in enumerate([nome_funil, "Ganho", dados['won']['count'], _moeda(dados['won']['value'])], 1):
+            c = ws4.cell(row=linha, column=col, value=v)
+            c.fill = _fill("E2EFDA"); c.border = _border(); c.alignment = _left() if col == 1 else _center()
+        linha += 1
+        for col, v in enumerate([nome_funil, "Perdido", dados['lost']['count'], "—"], 1):
+            c = ws4.cell(row=linha, column=col, value=v)
+            c.fill = _fill("FFDCE1"); c.border = _border(); c.alignment = _left() if col == 1 else _center()
+        linha += 1
+
+    _ajustar_colunas(ws4)
+
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    wb.save(filepath)
+    print(f"   Salvo: {filepath}")
+
+
+# ===== EMAIL HTML RESUMO =====
+
+def gerar_email_html_resumo(
+    vendedores: List[Dict],
+    finalizados: Dict,
+    vendedores_mkt: List[Dict],
+    finalizados_mkt: Dict,
+) -> str:
+    data_str = datetime.now().strftime("%d/%m/%Y")
+    hora_str = datetime.now().strftime("%H:%M")
+
+    total_criadas_com = sum(v.get('criadas', v['em_andamento'] + v['ganhos_3m'] + v['perdidos_3m']) for v in vendedores)
+    total_andamento = sum(v['em_andamento'] for v in vendedores)
+    total_ganhos_com = sum(v['ganhos_3m'] for v in vendedores)
+    total_perdidos_com = sum(v['perdidos_3m'] for v in vendedores)
+    total_valor_com = sum(v['valor_ganhos_3m'] for v in vendedores)
+
+    total_andamento_mkt = sum(v['em_andamento'] for v in vendedores_mkt)
+    total_ganhos_mkt = sum(v['ganhos_3m'] for v in vendedores_mkt)
+    total_perdidos_mkt = sum(v['perdidos_3m'] for v in vendedores_mkt)
+    total_valor_mkt = sum(v['valor_ganhos_3m'] for v in vendedores_mkt)
+
+    todas_rows = "".join(
+        f"<tr>"
+        f"<td><b>{v['vendedor']}</b></td>"
+        f"<td style='text-align:center;color:#00b4d8;font-weight:bold'>{v.get('criadas', v['em_andamento'] + v['ganhos_3m'] + v['perdidos_3m'])}</td>"
+        f"<td style='text-align:center;color:#00b4d8'>{v['em_andamento']}</td>"
+        f"<td style='text-align:center;color:#06d6a0'>{v['ganhos_3m'] + v['perdidos_3m']}</td>"
+        f"</tr>"
+        for v in vendedores if v['em_andamento'] > 0 or v['ganhos_3m'] > 0 or v['perdidos_3m'] > 0
     )
 
-    return html
+    periodo_inicio = (datetime.now().replace(day=1) - timedelta(days=60)).strftime("%d/%m/%y")
+    periodo_fim = datetime.now().strftime("%d/%m/%y")
+
+    return f"""<!DOCTYPE html>
+<html>
+<head><meta charset='UTF-8'><style>
+body{{font-family:Arial,sans-serif;background:#1a1a2e;margin:0;padding:20px}}
+.wrap{{max-width:700px;margin:0 auto;background:#16213e;border-radius:12px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,.4)}}
+.header{{background:#0f3460;color:#fff;padding:24px 30px}}
+.header h1{{margin:0;font-size:20px;color:#00b4d8}}
+.header p{{margin:4px 0 0;font-size:12px;opacity:.7;color:#ccc}}
+.body{{padding:24px 30px}}
+.section-title{{font-size:13px;font-weight:bold;color:#00b4d8;border-bottom:1px solid #00b4d8;padding-bottom:6px;margin:20px 0 12px;display:flex;justify-content:space-between;align-items:center}}
+.badge{{background:#0f3460;color:#00b4d8;font-size:10px;padding:3px 10px;border-radius:20px;border:1px solid #00b4d8}}
+.kpi-row{{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}}
+.kpi{{flex:1;min-width:120px;background:#0f3460;border-left:3px solid #00b4d8;padding:12px 16px;border-radius:6px}}
+.kpi .num{{font-size:26px;font-weight:bold;color:#00b4d8}}
+.kpi .lbl{{font-size:11px;color:#aaa;margin-top:2px}}
+.kpi.green{{border-color:#06d6a0}}.kpi.green .num{{color:#06d6a0}}
+.kpi.red{{border-color:#ef476f}}.kpi.red .num{{color:#ef476f}}
+table{{width:100%;border-collapse:collapse;font-size:13px}}
+th{{background:#0f3460;color:#00b4d8;padding:10px 12px;text-align:left;font-size:12px}}
+td{{padding:10px 12px;border-bottom:1px solid #0f3460;color:#e0e0e0}}
+tr:hover td{{background:#0f3460}}
+.footer{{text-align:center;color:#555;font-size:11px;padding:16px 30px;border-top:1px solid #0f3460}}
+</style></head>
+<body><div class='wrap'>
+<div class='header'>
+  <h1>Balanco por Vendedor ({periodo_inicio} ATE {periodo_fim})</h1>
+  <p>Gerado as {hora_str} em {data_str} | RD Station CRM | MAXIFORCE</p>
+</div>
+<div class='body'>
+
+<div class='section-title'>
+  INDICADORES COMERCIAL (ultimos 3 meses)
+</div>
+<div class='kpi-row'>
+  <div class='kpi'><div class='num'>{total_criadas_com}</div><div class='lbl'>Criadas</div></div>
+  <div class='kpi'><div class='num'>{total_andamento}</div><div class='lbl'>Em Andamento</div></div>
+  <div class='kpi green'><div class='num'>{total_ganhos_com}</div><div class='lbl'>Ganhos</div></div>
+  <div class='kpi red'><div class='num'>{total_perdidos_com}</div><div class='lbl'>Perdidos</div></div>
+  <div class='kpi green'><div class='num'>{_moeda(total_valor_com)}</div><div class='lbl'>Valor Ganhos</div></div>
+</div>
+
+<div class='section-title'>
+  BALANCO POR VENDEDOR
+  <span class='badge'>PYRAMID CLIENTES SEMANAL</span>
+</div>
+<table>
+<tr><th>Vendedor</th><th>Criadas</th><th>Em Andamento</th><th>Finalizadas</th></tr>
+{todas_rows}
+</table>
+
+</div>
+<div class='footer'>Relatorio automatico - RD Station CRM | MAXIFORCE</div>
+</div></body></html>"""
